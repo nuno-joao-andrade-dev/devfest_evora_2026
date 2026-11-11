@@ -1,0 +1,30 @@
+{
+  "name": "evora-academic-assistant",
+  "version": "1.0.0",
+  "description": "Building an Autonomous Academic Assistant with Local LLMs: ADK, Gemma 4, and Dynamic RAG (DevFest GDG Évora 2026)",
+  "type": "module",
+  "scripts": {
+    "smoke": "node src/smoke-test.js",
+    "seed": "node src/seed.js",
+    "step1": "node src/steps/step1-agent.js",
+    "step2": "node src/steps/step2-tools.js",
+    "step3": "node src/steps/step3-static-rag.js",
+    "step4": "node src/steps/step4-mutable-rag.js",
+    "step5": "node src/steps/step5-cli.js",
+    "start": "node src/steps/step5-cli.js",
+    "web": "adk web src/agent.js",
+    "web:step1": "adk web src/steps/step1-agent.js",
+    "web:step2": "adk web src/steps/step2-tools.js",
+    "web:step3": "adk web src/steps/step3-static-rag.js",
+    "web:step4": "adk web src/steps/step4-mutable-rag.js",
+    "slides": "node -e \"import('node:http').then(h=>import('node:fs').then(f=>h.createServer((_,r)=>{r.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});r.end(f.readFileSync('slides/index.html'));}).listen(3000,()=>console.log('📊 GDG Évora Workshop Slides: http://localhost:3000'))))\""
+  },
+  "dependencies": {
+    "@google/adk": "^2.4.0",
+    "dotenv": "^17.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@google/adk-devtools": "^2.4.0"
+  }
+}
