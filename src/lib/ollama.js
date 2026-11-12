@@ -5,9 +5,12 @@ import {
   generateClientFunctionCallId,
 } from '@google/adk';
 
-export const OLLAMA_HOST = (
-  process.env.OLLAMA_HOST || 'http://localhost:11434'
-).replace(/\/+$/, '');
+function normalizeOllamaHost(host) {
+  const cleaned = (host || 'http://localhost:11434').trim().replace(/\/+$/, '');
+  return /^https?:\/\//i.test(cleaned) ? cleaned : `http://${cleaned}`;
+}
+
+export const OLLAMA_HOST = normalizeOllamaHost(process.env.OLLAMA_HOST);
 export const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma4:e2b';
 export const OLLAMA_EMBED_MODEL =
   process.env.OLLAMA_EMBED_MODEL || 'embeddinggemma-2';
@@ -38,7 +41,7 @@ export class OllamaLlm extends BaseLlm {
     temperature = 0.2,
   } = {}) {
     super({ model });
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.baseUrl = normalizeOllamaHost(baseUrl);
     this.temperature = temperature;
   }
 
