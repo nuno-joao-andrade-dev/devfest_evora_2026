@@ -1,19 +1,65 @@
-import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import {
   BaseLlm,
   genaiSchemaToJsonSchema,
   generateClientFunctionCallId,
 } from '@google/adk';
 
-function normalizeOllamaHost(host) {
-  const cleaned = (host || 'http://localhost:11434').trim().replace(/\/+$/, '');
-  return /^https?:\/\//i.test(cleaned) ? cleaned : `http://${cleaned}`;
+const cwdEnvPath = path.resolve(process.cwd(), '.env');
+const moduleEnvPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../.env'
+);
+dotenv.config({
+  path: fs.existsSync(cwdEnvPath) ? cwdEnvPath : moduleEnvPath,
+  override: true,
+  quiet: true,
+});
+
+function parseOllamaHost(host) {
+  const cleaned = (host ?? '').trim().replace(/\/+$/, '') || 'http://localhost:11434';
+  const withScheme = /^https?:\/\//i.test(cleaned) ? cleaned : `http://${cleaned}`;
+  const url = new URL(withScheme);
+
+  let authHeader;
+  if (url.username || url.password) {
+    const credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
+    authHeader = `Basic ${Buffer.from(credentials, 'utf8').toString('base64')}`;
+    url.username = '';
+    url.password = '';
+  }
+
+  return {
+    baseUrl: url.toString().replace(/\/+$/, ''),
+    authHeader,
+  };
 }
 
-export const OLLAMA_HOST = normalizeOllamaHost(process.env.OLLAMA_HOST);
-export const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma4:e2b';
+function buildHeaders(authHeader, extraHeaders = {}) {
+  return {
+    'Content-Type': 'application/json',
+    ...(authHeader ? { Authorization: authHeader } : {}),
+    ...extraHeaders,
+  };
+}
+
+const DEFAULT_OLLAMA_TARGET = parseOllamaHost(process.env.OLLAMA_HOST);
+
+export const OLLAMA_HOST = DEFAULT_OLLAMA_TARGET.baseUrl;
+export const OLLAMA_MODEL = process.env.OLLAMA_MODEL?.trim() || 'gemma4:e2b';
 export const OLLAMA_EMBED_MODEL =
-  process.env.OLLAMA_EMBED_MODEL || 'embeddinggemma-2';
+  process.env.OLLAMA_EMBED_MODEL?.trim() || 'embeddinggemma-2';
+
+export function ollamaFetch(endpoint, options = {}) {
+  const pathSuffix = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return fetch(`${OLLAMA_HOST}${pathSuffix}`, {
+    ...options,
+    headers: buildHeaders(DEFAULT_OLLAMA_TARGET.authHeader, options.headers),
+  });
+}
 
 function extractSystemInstruction(llmRequest) {
   const sys = llmRequest.config?.systemInstruction;
@@ -41,7 +87,11 @@ export class OllamaLlm extends BaseLlm {
     temperature = 0.2,
   } = {}) {
     super({ model });
-    this.baseUrl = normalizeOllamaHost(baseUrl);
+    const target = parseOllamaHost(baseUrl);
+    this.baseUrl = target.baseUrl;
+    this.authHeader =
+      target.authHeader ??
+      (baseUrl === OLLAMA_HOST ? DEFAULT_OLLAMA_TARGET.authHeader : undefined);
     this.temperature = temperature;
   }
 
@@ -127,7 +177,7 @@ export class OllamaLlm extends BaseLlm {
 
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildHeaders(this.authHeader),
       body: JSON.stringify(payload),
       signal: abortSignal,
     });
@@ -176,9 +226,8 @@ export const localModel = createLocalModel();
  * Generates dense vectors via Ollama /api/embed (`embeddinggemma-2`).
  */
 export async function embedTexts(texts) {
-  const res = await fetch(`${OLLAMA_HOST}/api/embed`, {
+  const res = await ollamaFetch('/api/embed', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: OLLAMA_EMBED_MODEL, input: texts }),
   });
 

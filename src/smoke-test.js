@@ -3,15 +3,15 @@ import {
   OLLAMA_MODEL,
   OLLAMA_EMBED_MODEL,
   embedText,
+  ollamaFetch,
 } from './lib/ollama.js';
 
 console.log(`🔍 Checking Ollama at ${OLLAMA_HOST}`);
 console.log(`   Chat model:  ${OLLAMA_MODEL}`);
 console.log(`   Embed model: ${OLLAMA_EMBED_MODEL}\n`);
 
-const chatRes = await fetch(`${OLLAMA_HOST}/api/chat`, {
+const chatRes = await ollamaFetch('/api/chat', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     model: OLLAMA_MODEL,
     stream: false,
